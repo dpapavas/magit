@@ -1009,21 +1009,34 @@ to, or to some other symbolic-ref that points to the same ref."
 (defun magit-branch-at-point ()
   (magit-section-case
     (branch (oref it value))
-    (commit (magit-name-branch (oref it value)))))
+    (commit (or (magit--painted-branch-at-point)
+                (magit-name-branch (oref it value))))))
+
+(defun magit--painted-branch-at-point (&optional type)
+  (and (memq (get-text-property (point) 'face)
+             (nconc (and (not (eq type 'remote))
+                         (list 'magit-branch-local
+                               'magit-branch-current))
+                    (and (not (eq type 'local))
+                         (list 'magit-branch-remote
+                               'magit-branch-remote-head))))
+       (thing-at-point 'git-revision t)))
 
 (defun magit-local-branch-at-point ()
   (magit-section-case
     (branch (let ((branch (magit-ref-maybe-qualify (oref it value))))
               (when (member branch (magit-list-local-branch-names))
                 branch)))
-    (commit (magit-name-local-branch (oref it value)))))
+    (commit (or (magit--painted-branch-at-point 'local)
+                (magit-name-local-branch (oref it value))))))
 
 (defun magit-remote-branch-at-point ()
   (magit-section-case
     (branch (let ((branch (oref it value)))
               (when (member branch (magit-list-remote-branch-names))
                 branch)))
-    (commit (magit-name-remote-branch (oref it value)))))
+    (commit (or (magit--painted-branch-at-point 'remote)
+                (magit-name-remote-branch (oref it value))))))
 
 (defun magit-commit-at-point ()
   (or (magit-section-when commit)
@@ -1034,10 +1047,11 @@ to, or to some other symbolic-ref that points to the same ref."
   (or magit-buffer-refname
       (magit-section-case
         (branch (magit-ref-maybe-qualify (oref it value)))
-        (commit (let ((rev (oref it value)))
-                  (or (magit-name-branch rev)
-                      (magit-get-shortname rev)
-                      rev)))
+        (commit (or (magit--painted-branch-at-point)
+                    (let ((rev (oref it value)))
+                      (or (magit-name-branch rev)
+                          (magit-get-shortname rev)
+                          rev))))
         (tag (magit-ref-maybe-qualify (oref it value) "tags/")))
       (thing-at-point 'git-revision t)
       (and (derived-mode-p 'magit-revision-mode
